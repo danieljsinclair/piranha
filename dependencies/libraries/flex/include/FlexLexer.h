@@ -145,8 +145,8 @@ public:
   virtual int yywrap();
 
 protected:
-  virtual int LexerInput( char* buf, int max_size );
-  virtual void LexerOutput( const char* buf, int size );
+  virtual std::size_t LexerInput( char* buf, std::size_t max_size );
+  virtual void LexerOutput( const char* buf, std::size_t size );
   virtual void LexerError( const char* msg );
 
   void yyunput( int c, char* buf_ptr );
