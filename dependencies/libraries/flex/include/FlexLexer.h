@@ -145,6 +145,8 @@ public:
   virtual int yywrap();
 
 protected:
+  // Flex 2.6.4 generates these with size_t, update to match
+  // See: https://github.com/verilator/verilator/issues/3487
   virtual std::size_t LexerInput( char* buf, std::size_t max_size );
   virtual void LexerOutput( const char* buf, std::size_t size );
   virtual void LexerError( const char* msg );
