@@ -143,9 +143,13 @@ bool piranha::NodeProgram::execute() {
         }
     }
 
-    // Second pass: evaluate all remaining nodes
+    // Second pass: evaluate all remaining nodes (skip mutation nodes already evaluated)
     for (int i = 0; i < nodeCount; i++) {
         Node *node = m_topLevelContainer.getNode(i);
+
+        // Skip mutation nodes as they were already evaluated in the first pass
+        if (node->hasFlag(Node::META_MUTATION)) continue;
+
         const bool result = node->evaluate();
         if (!result) return false;
         if (isKilled()) return true;
