@@ -64,8 +64,8 @@ if(APPLE)
     if(NOT BISON_EXECUTABLE)
         find_program(BISON_EXECUTABLE bison)
     endif()
-elseif(UNIX)
-    find_program(BISON_EXECUTABLE bison)
+else()
+    find_program(BISON_EXECUTABLE NAMES bison win_bison)
 endif()
 
 # Verify Bison version
@@ -99,7 +99,7 @@ endif()
 # Find Flex
 # =========================================================
 
-find_program(FLEX_EXECUTABLE flex)
+find_program(FLEX_EXECUTABLE NAMES flex win_flex)
 if(FLEX_EXECUTABLE)
     message(STATUS "Found Flex: ${FLEX_EXECUTABLE}")
 endif()
@@ -121,6 +121,12 @@ if(APPLE)
     endif()
 elseif(UNIX)
     # Linux/BSD - CMake finds Boost in standard locations
+else()
+    # Windows - add BOOST_ROOT env var to CMake prefix path so
+    # find_package can locate BoostConfig.cmake in config mode
+    if(DEFINED ENV{BOOST_ROOT})
+        list(APPEND CMAKE_PREFIX_PATH "$ENV{BOOST_ROOT}")
+    endif()
 endif()
 
 find_package(Boost 1.40 COMPONENTS filesystem REQUIRED)
@@ -180,15 +186,24 @@ bison_target(
 add_flex_bison_dependency(lexer parser)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(dependencies/libraries/flex/include)
+if(WIN32)
+    # Use WinFlex's own FlexLexer.h so generated signatures match.
+    # The bundled FlexLexer.h uses std::size_t but WinFlex generates int.
+    get_filename_component(_flex_include_dir "${FLEX_EXECUTABLE}" DIRECTORY)
+    include_directories(BEFORE "${_flex_include_dir}")
+else()
+    include_directories(dependencies/libraries/flex/include)
+endif()
 include_directories(include)
 
-# Suppress warnings in Bison-generated code
-set_source_files_properties(
-    ${CMAKE_CURRENT_BINARY_DIR}/parser.auto.cpp
-    PROPERTIES
-    COMPILE_FLAGS "-Wno-unused-but-set-variable"
-)
+# Suppress warnings in Bison-generated code (GCC/Clang only)
+if(NOT MSVC)
+    set_source_files_properties(
+        ${CMAKE_CURRENT_BINARY_DIR}/parser.auto.cpp
+        PROPERTIES
+        COMPILE_FLAGS "-Wno-unused-but-set-variable"
+    )
+endif()
 
 add_library(piranha STATIC
     # Source files
