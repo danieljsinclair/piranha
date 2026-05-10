@@ -105,34 +105,6 @@ if(FLEX_EXECUTABLE)
 endif()
 
 # =========================================================
-# Platform-specific Boost configuration
-# =========================================================
-
-set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_MULTITHREADED ON)
-
-if(APPLE)
-    # Homebrew Boost paths
-    if(EXISTS "/opt/homebrew")
-        list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew")
-    endif()
-    if(EXISTS "/usr/local")
-        list(APPEND CMAKE_PREFIX_PATH "/usr/local")
-    endif()
-elseif(UNIX)
-    # Linux/BSD - CMake finds Boost in standard locations
-else()
-    # Windows - add BOOST_ROOT env var to CMake prefix path so
-    # find_package can locate BoostConfig.cmake in config mode
-    if(DEFINED ENV{BOOST_ROOT})
-        list(APPEND CMAKE_PREFIX_PATH "$ENV{BOOST_ROOT}")
-    endif()
-endif()
-
-find_package(Boost 1.40 COMPONENTS filesystem REQUIRED)
-message(STATUS "Found Boost ${Boost_VERSION}")
-
-# =========================================================
 # Platform-specific compiler flags
 # =========================================================
 
@@ -196,12 +168,43 @@ else()
 endif()
 include_directories(include)
 
+# =========================================================
+# Compiler flag compatibility (Clang version differences)
+# =========================================================
+
+# -Wno-unused-but-set-variable was renamed to -Wno-unused-const-variable in newer Clang
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wno-unused-but-set-variable HAVE_UNUSED_BUT_SET)
+check_cxx_compiler_flag(-Wno-unused-const-variable HAVE_UNUSED_CONST_VAR)
+
+if(HAVE_UNUSED_BUT_SET)
+    set(UNUSED_VAR_SUPPRESS "-Wno-unused-but-set-variable")
+elseif(HAVE_UNUSED_CONST_VAR)
+    set(UNUSED_VAR_SUPPRESS "-Wno-unused-const-variable")
+else()
+    set(UNUSED_VAR_SUPPRESS "")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "AppleClang|Clang|GNU")
+    add_compile_options(-Wall -Wextra)
+    if(APPLE)
+        add_compile_options(-Wno-unused-command-line-argument)
+    endif()
+    add_compile_options(-Wno-register)
+    # Suppress unknown warning option diagnostics (Clang warns when -Wno-*
+    # flags reference non-existent warnings; this matters under -Werror)
+    add_compile_options(-Wno-unknown-warning-option)
+    if(UNUSED_VAR_SUPPRESS)
+        add_compile_options(${UNUSED_VAR_SUPPRESS})
+    endif()
+endif()
+
 # Suppress warnings in Bison-generated code (GCC/Clang only)
-if(NOT MSVC)
+if(NOT MSVC AND UNUSED_VAR_SUPPRESS)
     set_source_files_properties(
         ${CMAKE_CURRENT_BINARY_DIR}/parser.auto.cpp
         PROPERTIES
-        COMPILE_FLAGS "-Wno-unused-but-set-variable"
+        COMPILE_FLAGS "${UNUSED_VAR_SUPPRESS}"
     )
 endif()
 
